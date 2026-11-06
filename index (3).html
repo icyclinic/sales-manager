@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sales Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+/* ===== 1. DESIGN TOKENS: change a colour here and it changes everywhere ===== */
+:root{--navy:#0e1a3a;--navy2:#1b2b57;--blue:#2563eb;--blue-s:#e8efff;--green:#15803d;--green-s:#e2f5e9;--red:#b42318;--bg:#f3f5f9;--card:#fff;--ink:#16203a;--mute:#66728c;--line:#e2e7f0;--r:14px;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Figtree,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select{font:inherit;color:inherit}
+h1{font-size:1.5rem;margin:0;letter-spacing:-.02em}h2{font-size:1.05rem;margin:0 0 12px}
+/* ===== 2. LAYOUT: sidebar + main ===== */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.side{background:var(--navy);color:#cdd6ee;padding:22px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px}
+.brand{display:flex;gap:10px;align-items:center;color:#fff;font-weight:800;font-size:1.1rem;padding:0 8px 18px}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--blue);display:grid;place-items:center}
+.nav a{display:flex;gap:12px;align-items:center;padding:11px 12px;border-radius:10px;color:inherit;text-decoration:none;font-weight:600}
+.nav a:hover{background:var(--navy2)}.nav a.on{background:var(--blue);color:#fff}
+.nav svg,.logo svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.biz{margin-top:auto;padding:12px;border-radius:12px;background:var(--navy2);font-size:.85rem}.biz b{display:block;color:#fff}
+main{padding:28px 32px 40px;max-width:1120px;width:100%}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}.top p{margin:2px 0 0;color:var(--mute)}
+.view{display:none}.view.on{display:block}
+/* ===== 3. COMPONENTS ===== */
+.card{background:var(--card);border-radius:var(--r);padding:20px;box-shadow:0 1px 2px rgba(14,26,58,.06),0 6px 20px rgba(14,26,58,.05)}
+.grid{display:grid;gap:16px}.stats{grid-template-columns:repeat(4,1fr);margin-bottom:16px}.two{grid-template-columns:1.6fr 1fr}
+.stat small{color:var(--mute);font-weight:600}.stat strong{display:block;font-size:1.6rem;letter-spacing:-.02em;margin-top:4px}
+.pos{color:var(--green)}
+.btn{border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer;background:var(--blue);color:#fff;display:inline-flex;gap:8px;align-items:center;text-decoration:none}
+.btn:hover{filter:brightness(1.08)}.btn.ghost{background:var(--blue-s);color:var(--blue)}.btn.danger{background:var(--red)}.btn.sm{padding:6px 12px;font-size:.85rem}
+:focus-visible{outline:3px solid #93b4ff;outline-offset:2px}
+label{display:block;font-weight:600;font-size:.88rem;margin-bottom:6px}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+input:focus,select:focus{border-color:var(--blue);outline:0;box-shadow:0 0 0 3px var(--blue-s)}
+.field{margin-bottom:16px}.form{max-width:520px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:10px}.seg input{position:absolute;opacity:0;width:0}
+.seg span{display:block;text-align:center;padding:11px;border:1px solid var(--line);border-radius:10px;font-weight:700;cursor:pointer}
+.seg input:checked+span{background:var(--blue-s);border-color:var(--blue);color:var(--blue)}
+.seg input:focus-visible+span{outline:3px solid #93b4ff}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;margin-bottom:14px}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:520px}
+th{text-align:left;color:var(--mute);font-size:.82rem;font-weight:600;padding:10px;border-bottom:1px solid var(--line)}
+td{padding:12px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border-bottom:0}.num{text-align:right;font-variant-numeric:tabular-nums}
+.tag{padding:3px 10px;border-radius:99px;font-size:.8rem;font-weight:700}.tag.Cash{background:var(--green-s);color:var(--green)}.tag.Transfer{background:var(--blue-s);color:var(--blue)}
+.tfoot{display:flex;justify-content:space-between;padding-top:14px;font-weight:700}
+.empty{text-align:center;color:var(--mute);padding:28px 0}
+.tabs{display:inline-flex;background:#e7ebf3;border-radius:10px;padding:4px;margin-bottom:16px}
+.tabs button{border:0;background:none;padding:8px 16px;border-radius:8px;font-weight:700;color:var(--mute);cursor:pointer}.tabs button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.split{height:12px;border-radius:99px;overflow:hidden;display:flex;background:var(--line);margin:8px 0 10px}.split i{display:block;background:var(--green)}.split i+i{background:var(--blue)}
+.row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translate(-50%,-90px);background:var(--green);color:#fff;padding:12px 20px;border-radius:12px;font-weight:700;transition:transform .25s;z-index:30;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+#toast.show{transform:translate(-50%,0)}
+dialog{border:0;border-radius:var(--r);padding:24px;width:min(420px,92vw);box-shadow:0 20px 60px rgba(14,26,58,.35)}dialog::backdrop{background:rgba(14,26,58,.5)}
+.acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.bottom{display:none}
+h1,h2,.brand,.stat strong{font-family:"Bricolage Grotesque",Figtree,system-ui,sans-serif}
+tbody tr:hover{background:#f7f9fd}.nav a.on{box-shadow:inset 3px 0 0 #fff}
+.stat.hero{background:var(--navy);color:#fff}.stat.hero small{color:#a9b8de}
+.app[hidden],.auth[hidden]{display:none}
+.staff .own{display:none}
+.who{margin-top:auto;display:flex;gap:10px;align-items:center;padding:12px;border-radius:12px;background:var(--navy2);font-size:.85rem}
+.who div{min-width:0;flex:1}.who b{display:block;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.av{width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
+.who button{background:none;border:0;color:#a9b8de;cursor:pointer;font-weight:600}.who button:hover{color:#fff}
+.auth{position:fixed;inset:0;z-index:50;display:grid;grid-template-columns:1.05fr 1fr;background:#fff;overflow:auto}
+.pitch{background:var(--navy);color:#fff;padding:56px;display:flex;flex-direction:column;justify-content:center;gap:26px}
+.pitch h1{font-size:2.8rem;line-height:1.04;max-width:12ch}.pitch p{color:#b8c4e6;max-width:38ch;margin:0}
+.tape{background:#fff;color:var(--ink);border-radius:6px;padding:18px 20px;width:min(300px,100%);font-family:ui-monospace,Menlo,monospace;font-size:.82rem;transform:rotate(-2deg);box-shadow:0 22px 40px rgba(0,0,0,.35)}
+.tape div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #c4cde0}
+.tape .t{border-bottom:0;border-top:2px solid var(--ink);margin-top:6px;font-size:.95rem}
+.formside{display:grid;place-items:center;padding:32px}.formside>div{width:min(400px,100%)}
+.err{color:var(--red);font-weight:600;min-height:1.4em;margin:0 0 8px}
+.chk{display:flex;gap:8px;align-items:center;font-weight:500;margin-bottom:12px}.chk input{width:auto}
+.auth[data-m=login] [data-s]{display:none}
+.auth:not([data-m=signup]) [data-b]{display:none}.auth:not([data-m=join]) [data-j]{display:none}
+#authTabs button{padding:8px 11px}
+.auth:not([data-m=login]) [data-l]{display:none}
+@media(max-width:820px){.auth{grid-template-columns:1fr}.pitch{padding:26px 22px;gap:14px}.pitch h1{font-size:1.9rem}.tape{display:none}}
+/* ===== 4. RESPONSIVE: tablet, then phone (sidebar becomes bottom tab bar) ===== */
+@media(max-width:980px){.stats{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}}
+@media(max-width:820px){
+ .app{grid-template-columns:1fr}.side{display:none}main{padding:20px 16px 110px}
+ .bottom{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;background:var(--navy);padding:8px 6px calc(8px + env(safe-area-inset-bottom,0px));z-index:20}
+ .bottom a{display:flex;flex-direction:column;align-items:center;gap:2px;color:#9fb0d8;text-decoration:none;font-size:.7rem;font-weight:600;padding:6px 0;border-radius:10px}
+ .bottom a.on{color:#fff}.bottom svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+ .bottom a.rec{color:#fff}.bottom a.rec svg{background:var(--blue);padding:8px;width:40px;height:40px;border-radius:50%;margin-top:-18px;box-shadow:0 4px 12px rgba(37,99,235,.5)}
+ .filters{grid-template-columns:1fr}.stat strong{font-size:1.3rem}
+}
+@media(max-width:420px){.stats{grid-template-columns:1fr 1fr;gap:10px}.card{padding:16px}}
+@media print{.side,.bottom,.top .btn,.tabs,#exports{display:none}main{padding:0}.card{box-shadow:none}}
+</style></head>
+<body>
+<section class="auth" id="auth" data-m="login"><div class="pitch"><div class="brand" style="padding:0"><span class="logo"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>Sales Manager</div>
+<h1>Know what your shop earned today.</h1><p>Record every sale in seconds and see cash, transfers and daily totals without a notebook.</p>
+<div class="tape" aria-hidden="true"><div><span>Photocopy x20</span><b>₦1,000</b></div><div><span>Passport photos</span><b>₦2,500</b></div><div><span>POS charge</span><b>₦1,000</b></div><div class="t"><b>Today</b><b>₦4,500</b></div></div></div>
+<div class="formside"><div><div class="tabs" id="authTabs"><button class="on" data-m="login" type="button">Log in</button><button data-m="signup" type="button">Create account</button><button data-m="join" type="button">Join with code</button></div>
+<form id="authForm"><h2 id="authTitle">Welcome back</h2>
+<div class="field" data-b><label for="aBiz">Business name</label><input id="aBiz" placeholder="e.g. Grace Print & Browse"></div>
+<div class="field" data-s><label for="aName">Your name</label><input id="aName" autocomplete="name"></div>
+<div class="field" data-j><label for="aCode">Employee code (from your manager)</label><input id="aCode" autocomplete="off"></div>
+<div class="field"><label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" required></div>
+<div class="field"><label for="aPass">Password</label><input id="aPass" type="password" minlength="6" autocomplete="current-password" required></div>
+<p data-l style="margin:-8px 0 14px;text-align:right"><a href="#" id="forgot" style="color:var(--blue);font-weight:600;font-size:.88rem">Forgot password?</a></p>
+<p class="err" id="authErr" role="alert"></p>
+<button class="btn" id="authBtn" style="width:100%;justify-content:center">Log in</button>
+<p style="color:var(--mute);font-size:.82rem;margin-top:14px">Your sales are saved securely online and shared with your team.</p></form></div></div></section>
+<div class="app" id="app" hidden>
+ <aside class="side">
+  <div class="brand"><span class="logo"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>Sales Manager</div>
+  <nav class="nav" id="nav"></nav>
+  <div class="who"><span class="av" id="av"></span><div><b id="bizName"></b><small id="uName"></small></div><button id="logout" type="button">Log out</button></div>
+ </aside>
+
+ <main>
+  <!-- DASHBOARD -->
+  <section class="view" id="v-dashboard">
+   <div class="top"><div><h1>Dashboard</h1><p id="todayLabel"></p></div><a class="btn" href="#record">+ Record Sale</a></div>
+   <div class="grid stats" id="stats"></div>
+   <div class="grid two">
+    <div class="card"><h2>Sales, last 7 days</h2><div id="dashChart"></div></div>
+    <div class="card"><h2>Recent transactions</h2><div id="recent"></div></div>
+    <div class="card" style="grid-column:1/-1"><h2>Today by employee</h2><div id="byStaff"></div></div>
+   </div>
+  </section>
+
+  <!-- RECORD SALE -->
+  <section class="view" id="v-record">
+   <div class="top"><div><h1>Record Sale</h1><p>Takes about five seconds.</p></div></div>
+   <form class="card form" id="saleForm" autocomplete="off">
+    <div class="field"><label for="fDate">Date</label><input type="date" id="fDate" required></div>
+    <div class="field"><label for="fService">Service</label><input id="fService" list="services" placeholder="e.g. Photocopy" required><datalist id="services"></datalist></div>
+    <div class="field"><label for="fAmount" id="amtLabel">Amount paid</label><input id="fAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="0" required></div>
+    <div class="field"><label>Payment method</label>
+     <div class="seg"><label><input type="radio" name="method" value="Cash" checked><span>Cash</span></label><label><input type="radio" name="method" value="Transfer"><span>Transfer</span></label></div></div>
+    <button class="btn" type="submit" style="width:100%;justify-content:center">Save Sale</button>
+   </form>
+  </section>
+
+  <!-- TRANSACTIONS -->
+  <section class="view" id="v-transactions">
+   <div class="top"><div><h1>Transactions</h1><p id="txCount"></p></div><div class="row own"><button class="btn ghost" id="obBtn">Opening balance</button><button class="btn" id="impBtn">Import CSV</button></div></div>
+   <div class="card">
+    <div class="filters">
+     <input id="qSearch" type="search" placeholder="Search service, amount or employee" aria-label="Search">
+     <input id="qFrom" type="date" aria-label="From date"><input id="qTo" type="date" aria-label="To date">
+     <select id="qMethod" aria-label="Payment method"><option value="">All methods</option><option>Cash</option><option>Transfer</option></select>
+    </div>
+    <div class="scroll"><table><thead><tr><th>Date</th><th>Service</th><th class="num">Amount paid</th><th>Method</th><th>Recorded by</th><th class="num">Actions</th></tr></thead><tbody id="txBody"></tbody></table></div>
+    <div class="tfoot"><span>Total (filtered)</span><span id="txTotal" class="pos"></span></div>
+   </div>
+  </section>
+
+  <!-- REPORTS -->
+  <section class="view" id="v-reports">
+   <div class="top"><div><h1>Reports</h1><p id="repRange"></p></div>
+    <div id="exports" class="row"><button class="btn ghost" id="exCsv">Export CSV</button><button class="btn" id="exPdf">Export PDF</button></div></div>
+   <div class="tabs" id="repTabs"><button data-p="daily" class="on">Daily</button><button data-p="weekly">Weekly</button><button data-p="monthly">Monthly</button></div>
+   <div class="grid stats" id="repStats"></div>
+   <div class="grid two">
+    <div class="card"><h2 id="repChartTitle">Sales performance</h2><div id="repChart"></div></div>
+    <div class="card"><h2>Cash vs transfer</h2><div id="breakdown"></div></div>
+   </div>
+   <div class="card" style="margin-top:16px"><div class="scroll"><table><thead><tr><th>Period</th><th class="num">Sales</th><th class="num">Cash</th><th class="num">Transfer</th><th class="num">Total</th></tr></thead><tbody id="repBody"></tbody></table></div></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="v-settings">
+   <div class="top"><div><h1>Settings</h1><p>Saved automatically on this device.</p></div></div>
+   <div class="card form">
+    <div class="field"><label for="sBiz">Business name</label><input id="sBiz"></div>
+    <div class="field"><label for="sCur">Currency</label><select id="sCur"><option value="₦">Nigerian naira (₦)</option><option value="$">US dollar ($)</option><option value="£">Pound (£)</option><option value="€">Euro (€)</option></select></div>
+    <div class="field"><label for="sDate">Date format</label><select id="sDate"><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
+    <div class="field"><label for="sConfirm">Ask before deleting</label><select id="sConfirm"><option value="yes">Yes, always confirm</option><option value="no">No, delete straight away</option></select></div>
+    <div class="row"><button class="btn ghost" id="logout2" type="button">Log out</button><button class="btn danger" id="clearAll" type="button">Clear all sales</button></div>
+   </div>
+   <div class="card form" style="margin-top:16px"><h2>Employees</h2><p style="color:var(--mute);margin:0 0 14px">Give employees this code. On the sign-in page they choose “Join with code”, enter it and make their own login. They can record sales but can’t see reports, settings or other people’s sales.</p>
+    <div class="field"><label>Employee code</label><input id="bizCode" readonly></div><div id="team"></div>
+   </div>
+  </section>
+ </main>
+</div>
+<nav class="bottom" id="bottomNav"></nav>
+<div id="toast" role="status"></div>
+
+<dialog id="editDlg"><form method="dialog" id="editForm"><h2>Edit transaction</h2>
+ <div class="field"><label>Date</label><input type="date" id="eDate" required></div>
+ <div class="field"><label>Service</label><input id="eService" required></div>
+ <div class="field"><label>Amount paid</label><input type="number" id="eAmount" min="1" step="any" required></div>
+ <div class="field"><label>Payment method</label><select id="eMethod"><option>Cash</option><option>Transfer</option></select></div>
+ <div class="acts"><button class="btn ghost" type="button" id="eCancel">Cancel</button><button class="btn" type="submit">Save changes</button></div></form></dialog>
+<dialog id="impDlg"><h2>Import past sales</h2><p style="color:var(--mute);margin:0 0 12px">Choose a CSV file with the columns Date, Service, Amount, Method (Cash or Transfer). Dates like 2026-10-31 or 31/10/2026 both work.</p>
+ <button class="btn ghost sm" id="tplBtn" type="button">Download template</button>
+ <div class="field" style="margin-top:14px"><input type="file" id="impFile" accept=".csv,text/csv"></div><p id="impMsg" style="font-weight:600"></p>
+ <div class="acts"><button class="btn ghost" id="impCancel" type="button">Cancel</button><button class="btn" id="impOk" type="button" disabled>Import sales</button></div></dialog>
+<dialog id="obDlg"><form method="dialog" id="obForm"><h2>Add opening balance</h2><p style="color:var(--mute);margin:0 0 14px">Only have totals? Enter what the business earned before using the app. Add one entry per day or per month.</p>
+ <div class="field"><label for="oDate">Date these sales belong to</label><input type="date" id="oDate" required></div>
+ <div class="field"><label for="oCash">Cash total</label><input type="number" id="oCash" min="0" step="any" placeholder="0"></div>
+ <div class="field"><label for="oTr">Transfer total</label><input type="number" id="oTr" min="0" step="any" placeholder="0"></div>
+ <div class="field"><label for="oNote">Note</label><input id="oNote" placeholder="Earlier sales (total)"></div>
+ <div class="acts"><button class="btn ghost" type="button" id="oCancel">Cancel</button><button class="btn" type="submit">Save opening balance</button></div></form></dialog>
+<dialog id="fgDlg"><h2>Reset your password</h2><p style="color:var(--mute);margin:0 0 12px">Enter the email you signed up with and we’ll send you a link to choose a new password.</p>
+ <div class="field"><label for="fgEmail">Email</label><input id="fgEmail" type="email"></div><p id="fgMsg" style="font-weight:600"></p>
+ <div class="acts"><button class="btn ghost" id="fgCancel" type="button">Close</button><button class="btn" id="fgSend" type="button">Send reset link</button></div></dialog>
+<dialog id="npDlg"><h2>Choose a new password</h2>
+ <div class="field"><label for="npPass">New password</label><input id="npPass" type="password" minlength="6" autocomplete="new-password"></div><p id="npMsg" class="err"></p>
+ <div class="acts"><button class="btn" id="npSave" type="button">Save password</button></div></dialog>
+<dialog id="delDlg"><h2>Delete this sale?</h2><p id="delText" style="color:var(--mute);margin:0">This can’t be undone.</p>
+ <div class="acts"><button class="btn ghost" id="dCancel">Keep it</button><button class="btn danger" id="dOk">Delete sale</button></div></dialog>
+
+<script>
+/* ===== A. HELPERS: tiny functions reused everywhere ===== */
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;   // Date -> "2026-11-06"
+const today = () => iso(new Date());
+const addDays = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return iso(d); };
+const sum = list => list.reduce((t, x) => t + x.amount, 0);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function load(key, fallback) { try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; } catch (e) { return fallback; } }
+function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+
+/* ===== B. DATA: everything the app knows lives in two variables, saved to localStorage ===== */
+let TX_KEY, SET_KEY, settings, tx, session;   // filled in by startSession() after login: each account has its own keys
+
+function sampleData() {   // realistic demo sales, always relative to today so the dashboard has live figures
+  const svc = ['Photocopy', 'Printing (A4)', 'Lamination', 'Browsing (1 hr)', 'POS charge', 'Passport photos', 'Binding', 'Scanning', 'Typing & printing', 'Airtime'];
+  const price = [500, 1200, 800, 600, 1000, 2500, 1500, 400, 2000, 1000];
+  const out = []; let id = 1;
+  for (let d = 0; d < 35; d++) {
+    const n = 3 + (d * 7) % 5;
+    for (let i = 0; i < n; i++) {
+      const k = (d * 3 + i * 7) % svc.length;
+      out.push({ id: 's' + id++, date: addDays(today(), -d), service: svc[k], amount: price[k] + ((d + i) % 4) * 250, method: (d + i) % 3 === 0 ? 'Transfer' : 'Cash' });
+    }
+  }
+  return out;
+}
+// persist() is defined in section J: it syncs changes to the database
+
+/* ===== C. FORMATTING: naira and dates ===== */
+const money = n => settings.currency + Math.round(n).toLocaleString('en-NG');
+function fmtDate(s) {
+  const [y, m, d] = s.split('-');
+  return settings.dateFormat === 'MM/DD/YYYY' ? `${m}/${d}/${y}` : settings.dateFormat === 'YYYY-MM-DD' ? s : `${d}/${m}/${y}`;
+}
+const longDay = s => new Date(s + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+/* ===== D. CHART: draws bars as an SVG string from [{label, value}] ===== */
+function chart(data) {
+  const W = 600, H = 220, pb = 28, pt = 14, max = Math.max(...data.map(d => d.value), 1), bw = W / data.length;
+  const grid = [0, .5, 1].map(f => { const y = pt + (H - pb - pt) * (1 - f); return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="#e2e7f0"/>`; }).join('');
+  const bars = data.map((d, i) => {
+    const h = (H - pb - pt) * d.value / max;
+    return `<rect x="${i * bw + bw * .2}" y="${H - pb - h}" width="${bw * .6}" height="${h}" rx="5" fill="${i === data.length - 1 ? '#2563eb' : '#a9c0f7'}"><title>${d.label}: ${money(d.value)}</title></rect>` +
+      `<text x="${i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#66728c">${d.label}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Sales chart">${grid}${bars}</svg>`;
+}
+const statCard = (label, value, kind) => `<div class="card stat ${kind === 'hero' ? 'hero' : ''}"><small>${label}</small><strong class="${kind === true ? 'pos' : ''}">${value}</strong></div>`;
+const rowHtml = t => `<tr><td>${fmtDate(t.date)}</td><td>${esc(t.service)}</td><td class="num">${money(t.amount)}</td><td><span class="tag ${t.method}">${t.method}</span></td><td>${esc(t.by || '—')}</td>`;
+
+/* ===== E. RENDER FUNCTIONS: each one rebuilds one page from the data ===== */
+function renderDashboard() {
+  const t = tx.filter(x => x.date === today());
+  const h = new Date().getHours();
+  $('#todayLabel').textContent = `${h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'}, ${session.name.split(' ')[0]} · ${longDay(today())}`;
+  $('#stats').innerHTML =
+    statCard('Total sales today', money(sum(t)), 'hero') + statCard('Transactions today', t.length) +
+    statCard('Cash received', money(sum(t.filter(x => x.method === 'Cash')))) + statCard('Transfers received', money(sum(t.filter(x => x.method === 'Transfer'))));
+  const days = [...Array(7)].map((_, i) => addDays(today(), i - 6));
+  $('#dashChart').innerHTML = chart(days.map(d => ({ label: new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short' }), value: sum(tx.filter(x => x.date === d)) })));
+  const by = {}; t.forEach(x => { const k = x.by || 'Unassigned'; (by[k] = by[k] || { n: 0, v: 0 }).n++; by[k].v += x.amount; });
+  $('#byStaff').innerHTML = Object.keys(by).length ? `<table style="min-width:0">${Object.entries(by).sort((a, b) => b[1].v - a[1].v).map(([k, s]) => `<tr><td>${esc(k)}</td><td class="num">${s.n} sales</td><td class="num pos"><b>${money(s.v)}</b></td></tr>`).join('')}</table>` : '<div class="empty">No sales recorded today.</div>';
+  const recent = sorted(tx).slice(0, 6);
+  $('#recent').innerHTML = recent.length ? `<table style="min-width:0">${recent.map(x => `<tr><td>${esc(x.service)}<br><small style="color:var(--mute)">${fmtDate(x.date)} · ${x.method}</small></td><td class="num pos"><b>${money(x.amount)}</b></td></tr>`).join('')}</table>` : '<div class="empty">No sales yet. Record your first one.</div>';
+}
+const sorted = list => [...list].sort((a, b) => b.date.localeCompare(a.date));   // newest first (stable: new sales stay on top)
+
+function filtered() {
+  const q = $('#qSearch').value.trim().toLowerCase(), from = $('#qFrom').value, to = $('#qTo').value, m = $('#qMethod').value;
+  return sorted(tx).filter(x => (isOwner() || x.uid === session.id) && (!q || (x.service + ' ' + (x.by || '')).toLowerCase().includes(q) || String(x.amount).includes(q)) && (!from || x.date >= from) && (!to || x.date <= to) && (!m || x.method === m));
+}
+function renderTransactions() {
+  const list = filtered();
+  $('#txBody').innerHTML = list.length ? list.map(x => rowHtml(x) + `<td class="num"><button class="btn ghost sm" data-edit="${x.id}">Edit</button> <button class="btn ghost sm" data-del="${x.id}" style="color:var(--red)">Delete</button></td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No sales match these filters.</td></tr>';
+  $('#txTotal').textContent = money(sum(list));
+  $('#txCount').textContent = `${list.length} of ${tx.length} sales shown`;
+}
+
+let period = 'daily';
+function groups() {   // turns the saved sales into rows: one per day, week or month
+  const out = [], now = new Date();
+  if (period === 'daily') for (let i = 0; i < 14; i++) { const d = addDays(today(), -i); out.push({ label: new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), from: d, to: d }); }
+  if (period === 'weekly') { const mon = addDays(today(), -((now.getDay() + 6) % 7)); for (let i = 0; i < 8; i++) { const f = addDays(mon, -7 * i); out.push({ label: 'Wk ' + new Date(f + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), from: f, to: addDays(f, 6) }); } }
+  if (period === 'monthly') for (let i = 0; i < 6; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); out.push({ label: d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }), from: iso(d), to: iso(new Date(d.getFullYear(), d.getMonth() + 1, 0)) }); }
+  return out.map(g => ({ ...g, list: tx.filter(x => x.date >= g.from && x.date <= g.to) }));
+}
+function renderReports() {
+  const g = groups(), all = g.flatMap(x => x.list), cash = all.filter(x => x.method === 'Cash'), tr = all.filter(x => x.method === 'Transfer');
+  $('#repRange').textContent = `${fmtDate(g[g.length - 1].from)} to ${fmtDate(g[0].to > today() ? today() : g[0].to)}`;
+  $('#repStats').innerHTML = statCard('Total sales', money(sum(all)), true) + statCard('Transactions', all.length) + statCard('Cash', money(sum(cash))) + statCard('Transfer', money(sum(tr)));
+  $('#repChart').innerHTML = chart([...g].reverse().map(x => ({ label: x.label.replace('Wk ', ''), value: sum(x.list) })));
+  $('#repChartTitle').textContent = { daily: 'Last 14 days', weekly: 'Last 8 weeks', monthly: 'Last 6 months' }[period];
+  const total = sum(all) || 1, cp = Math.round(sum(cash) / total * 100);
+  $('#breakdown').innerHTML = `<div class="split"><i style="width:${cp}%"></i><i style="width:${100 - cp}%"></i></div>
+   <div class="row"><span><b class="pos">●</b> Cash ${cp}%</span><b>${money(sum(cash))}</b></div><div class="row" style="margin-top:6px"><span><b style="color:var(--blue)">●</b> Transfer ${100 - cp}%</span><b>${money(sum(tr))}</b></div>`;
+  $('#repBody').innerHTML = g.map(x => `<tr><td>${x.label}</td><td class="num">${x.list.length}</td><td class="num">${money(sum(x.list.filter(t => t.method === 'Cash')))}</td><td class="num">${money(sum(x.list.filter(t => t.method === 'Transfer')))}</td><td class="num"><b>${money(sum(x.list))}</b></td></tr>`).join('');
+  return { g, all };
+}
+function renderSettings() { renderTeam(); $('#sBiz').value = settings.business; $('#sCur').value = settings.currency; $('#sDate').value = settings.dateFormat; $('#sConfirm').value = settings.confirmDelete; }
+function renderChrome() {   // things shown on every page
+  $('#bizName').textContent = settings.business; document.title = settings.business + ' · Sales Manager';
+  $('#amtLabel').textContent = `Amount paid (${settings.currency})`;
+  $('#services').innerHTML = [...new Set(tx.map(x => x.service))].sort().map(s => `<option value="${esc(s)}">`).join('');
+}
+const refresh = () => { renderChrome(); renderDashboard(); renderTransactions(); renderReports(); };
+
+/* ===== F. NAVIGATION: the URL hash (#dashboard) decides which page is visible ===== */
+const PAGES = [['dashboard', 'Dashboard', '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'],
+  ['record', 'Record Sale', '<path d="M12 5v14M5 12h14"/>'], ['transactions', 'Transactions', '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'],
+  ['reports', 'Reports', '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>'], ['settings', 'Settings', '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>']];
+const link = (p, cls = '') => `<a href="#${p[0]}" data-p="${p[0]}" class="${cls}"><svg viewBox="0 0 24 24">${p[2]}</svg>${p[1]}</a>`;
+const isOwner = () => session.role !== 'staff';   // employees are created with role 'staff'
+const allowed = () => isOwner() ? PAGES : PAGES.filter(p => ['record', 'transactions'].includes(p[0]));   // what each role may open
+function buildNav() {
+  $('#nav').innerHTML = allowed().map(p => link(p)).join('');
+  $('#bottomNav').innerHTML = allowed().map(p => link(p, p[0] === 'record' ? 'rec' : '')).join('');
+  $('#bottomNav').style.gridTemplateColumns = `repeat(${allowed().length},1fr)`;
+}
+function route() {
+  const ok = allowed().map(p => p[0]), h = location.hash.slice(1), page = ok.includes(h) ? h : ok[0];
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + page));
+  document.querySelectorAll('[data-p]').forEach(a => a.classList.toggle('on', a.dataset.p === page && a.tagName === 'A'));
+  if (page === 'record') { $('#fDate').value = $('#fDate').value || today(); }
+  if (page === 'settings') renderSettings();
+  window.scrollTo(0, 0);
+}
+addEventListener('hashchange', route);
+
+/* ===== G. ACTIONS: add, edit, delete ===== */
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400); }
+
+$('#saleForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const amount = parseFloat($('#fAmount').value), service = $('#fService').value.trim();
+  if (!service || !(amount > 0)) return toast('Enter a service and an amount');
+  tx.unshift({ id: 't' + Date.now(), date: $('#fDate').value || today(), service, amount, method: document.querySelector('[name=method]:checked').value, by: session.name, uid: session.id });   // remember who recorded it
+  persist(); refresh();
+  e.target.reset(); $('#fDate').value = today();   // clear form, keep date on today
+  toast('Sale saved ✓'); $('#fService').focus();
+});
+
+let editId = null, delId = null;
+$('#txBody').addEventListener('click', e => {
+  const ed = e.target.closest('[data-edit]'), de = e.target.closest('[data-del]');
+  if (ed) { const t = tx.find(x => x.id === ed.dataset.edit); editId = t.id; $('#eDate').value = t.date; $('#eService').value = t.service; $('#eAmount').value = t.amount; $('#eMethod').value = t.method; $('#editDlg').showModal(); }
+  if (de) { const t = tx.find(x => x.id === de.dataset.del); delId = t.id; if (settings.confirmDelete === 'no') return doDelete(); $('#delText').textContent = `${t.service}, ${money(t.amount)} on ${fmtDate(t.date)}. This can’t be undone.`; $('#delDlg').showModal(); }
+});
+$('#editForm').addEventListener('submit', () => {
+  const t = tx.find(x => x.id === editId); if (!t) return;
+  Object.assign(t, { date: $('#eDate').value, service: $('#eService').value.trim(), amount: parseFloat($('#eAmount').value), method: $('#eMethod').value });
+  persist(); refresh(); toast('Changes saved ✓');
+});
+$('#eCancel').onclick = () => $('#editDlg').close();
+function doDelete() { tx = tx.filter(x => x.id !== delId); persist(); refresh(); $('#delDlg').close(); toast('Sale deleted'); }
+$('#dOk').onclick = doDelete; $('#dCancel').onclick = () => $('#delDlg').close();
+['#qSearch', '#qFrom', '#qTo', '#qMethod'].forEach(s => $(s).addEventListener('input', renderTransactions));
+
+/* ===== H. REPORTS: tabs and exports ===== */
+$('#repTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; period = b.dataset.p; document.querySelectorAll('#repTabs button').forEach(x => x.classList.toggle('on', x === b)); renderReports(); });
+function saveFile(filename, data) {   // normal browser download
+  const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type: 'text/csv' })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('#exCsv').onclick = () => {
+  const { all } = renderReports();
+  const rows = [['Date', 'Service', 'Amount', 'Method', 'Recorded by'], ...sorted(all).map(t => [t.date, '"' + t.service.replace(/"/g, '""') + '"', t.amount, t.method, '"' + (t.by || '') + '"'])];
+  saveFile(`sales-${period}-${today()}.csv`, rows.map(r => r.join(',')).join('\n'));
+};
+$('#exPdf').onclick = () => {
+  const { g, all } = renderReports(), { jsPDF } = window.jspdf || {};
+  if (!jsPDF) return toast('PDF tool did not load');
+  const cur = settings.currency === '₦' ? 'NGN ' : settings.currency, m = n => cur + Math.round(n).toLocaleString('en-NG');   // built-in PDF font has no ₦ symbol
+  const doc = new jsPDF(); let y = 20;
+  doc.setFontSize(16); doc.text(`${settings.business}: ${period} sales report`, 14, y);
+  doc.setFontSize(10); y += 8; doc.text(`Total ${m(sum(all))}   |   ${all.length} sales   |   Cash ${m(sum(all.filter(t => t.method === 'Cash')))}   |   Transfer ${m(sum(all.filter(t => t.method === 'Transfer')))}`, 14, y);
+  y += 12; doc.setFont(undefined, 'bold'); ['Period', 'Sales', 'Cash', 'Transfer', 'Total'].forEach((h, i) => doc.text(h, 14 + i * 38, y)); doc.setFont(undefined, 'normal');
+  g.forEach(x => { y += 8; if (y > 280) { doc.addPage(); y = 20; } [x.label, String(x.list.length), m(sum(x.list.filter(t => t.method === 'Cash'))), m(sum(x.list.filter(t => t.method === 'Transfer'))), m(sum(x.list))].forEach((c, i) => doc.text(c, 14 + i * 38, y)); });
+  saveFile(`sales-${period}-${today()}.pdf`, doc.output('blob'));
+};
+
+/* ===== I. SETTINGS ===== */
+const setSetting = (k, v) => {
+  settings[k] = v; refresh();
+  if (k === 'confirmDelete') save('sm_confirm_' + session.id, v);   // personal preference stays on this device
+  const col = { business: 'name', currency: 'currency', dateFormat: 'date_format' }[k];   // shared business settings go online
+  if (col && isOwner()) db.from('sm_businesses').update({ [col]: v }).eq('id', session.biz).then(({ error }) => { if (error) toast('Could not save setting'); });
+};
+$('#sBiz').addEventListener('input', e => setSetting('business', e.target.value || 'My Business'));
+$('#sCur').onchange = e => setSetting('currency', e.target.value);
+$('#sDate').onchange = e => setSetting('dateFormat', e.target.value);
+$('#sConfirm').onchange = e => setSetting('confirmDelete', e.target.value);
+let clearArmed = false;   // two-step delete: first click arms it, second click clears
+$('#clearAll').onclick = e => {
+  const b = e.currentTarget;
+  if (!clearArmed) { clearArmed = true; b.textContent = 'Click again to delete all sales'; setTimeout(() => { clearArmed = false; b.textContent = 'Clear all sales'; }, 4000); return; }
+  tx = []; persist(); refresh(); clearArmed = false; b.textContent = 'Clear all sales'; toast('All sales cleared');
+};
+
+/* ===== START ===== */
+/* ===== J. SUPABASE: real accounts and a shared online database ===== */
+const SUPABASE_URL = 'https://asojtxdrdwstnegvtaou.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_KHaF4v6vHCj5y1J2qYKOzA_ss-kbiVA';   // public key: safe in the browser; the database rules protect the data
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// persist() compares the in-memory list `tx` with what the database holds and sends only the differences.
+const isUuid = s => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(s);
+let synced = new Map();   // id -> JSON text of each row as the database has it
+const toRow = t => ({ id: t.id, business_id: session.biz, user_id: t.uid || session.id, recorded_by: t.by || session.name, sale_date: t.date, service: t.service, amount: t.amount, method: t.method });
+let syncing = Promise.resolve();
+function persist() {
+  tx.forEach(t => { if (!isUuid(t.id)) t.id = crypto.randomUUID(); });
+  const snap = new Map(tx.map(t => [t.id, JSON.stringify(t)]));
+  const add = tx.filter(t => !synced.has(t.id)), upd = tx.filter(t => synced.has(t.id) && synced.get(t.id) !== snap.get(t.id)), del = [...synced.keys()].filter(id => !snap.has(id));
+  synced = snap;
+  syncing = syncing.then(async () => {
+    try {
+      for (let i = 0; i < add.length; i += 500) { const { error } = await db.from('sm_transactions').insert(add.slice(i, i + 500).map(toRow)); if (error) throw error; }
+      for (const t of upd) { const { error } = await db.from('sm_transactions').update({ sale_date: t.date, service: t.service, amount: t.amount, method: t.method }).eq('id', t.id); if (error) throw error; }
+      for (let i = 0; i < del.length; i += 100) { const { error } = await db.from('sm_transactions').delete().in('id', del.slice(i, i + 100)); if (error) throw error; }
+    } catch (e) { toast('Not saved online: ' + (e.message || e)); }
+  });
+}
+
+let authMode = 'login';
+function setMode(m) {
+  authMode = m; $('#auth').dataset.m = m;
+  document.querySelectorAll('#authTabs button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  $('#authTitle').textContent = { login: 'Welcome back', signup: 'Set up your shop', join: 'Join your employer' }[m];
+  $('#authBtn').textContent = { login: 'Log in', signup: 'Create account', join: 'Join business' }[m];
+  $('#aPass').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+  $('#authErr').textContent = '';
+  $('#aBiz').required = m === 'signup'; $('#aName').required = m !== 'login'; $('#aCode').required = m === 'join';
+}
+$('#authTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); });
+$('#authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('#authBtn'), email = $('#aEmail').value.trim().toLowerCase(), password = $('#aPass').value;
+  btn.disabled = true; $('#authErr').textContent = '';
+  try {
+    if (authMode === 'login') {
+      const { error } = await db.auth.signInWithPassword({ email, password }); if (error) throw error;
+    } else {
+      let { data, error } = await db.auth.signUp({ email, password });
+      if (error && /registered/i.test(error.message)) {   // finish a half-made account, if the password matches
+        const r = await db.auth.signInWithPassword({ email, password });
+        if (r.error) throw new Error('This email already has an account, but the password does not match it (or the email was never confirmed). Try Log in, or delete the user in Supabase under Authentication > Users and sign up again.');
+        data = r.data; error = null;
+      }
+      if (error) throw error;
+      if (!data.session) throw new Error('Turn off “Confirm email” in Supabase (Authentication settings), or confirm your email and then log in.');
+      const { error: e2 } = authMode === 'signup'
+        ? await db.rpc('sm_create_business', { biz: $('#aBiz').value.trim(), owner_name: $('#aName').value.trim() })
+        : await db.rpc('sm_join_business', { code: $('#aCode').value.trim(), staff_name: $('#aName').value.trim() });
+      if (e2) throw e2;
+    }
+    await enter();
+  } catch (err) { $('#authErr').textContent = err.message || 'Something went wrong. Try again.'; }
+  finally { btn.disabled = false; }
+});
+
+async function enter() {   // after login: load this person's business, settings and sales, then show the app
+  const { data: { user } } = await db.auth.getUser(); if (!user) return;
+  const { data: p, error } = await db.from('sm_profiles').select('name, role, business_id, sm_businesses(name, currency, date_format)').eq('user_id', user.id).maybeSingle();
+  if (error) throw error;
+  if (!p) { await db.auth.signOut(); $('#authErr').textContent = 'This login has no business yet. Use “Create account” or “Join with code”.'; return; }
+  const b = p.sm_businesses;
+  session = { id: user.id, name: p.name, role: p.role, biz: p.business_id, business: b.name };
+  settings = { business: b.name, currency: b.currency, dateFormat: b.date_format, confirmDelete: load('sm_confirm_' + user.id, 'yes') };
+  tx = [];
+  for (let from = 0; ; from += 1000) {   // the database returns 1000 rows at a time
+    const { data, error: e3 } = await db.from('sm_transactions').select('*').order('sale_date', { ascending: false }).range(from, from + 999);
+    if (e3) throw e3;
+    tx.push(...data.map(r => ({ id: r.id, date: r.sale_date, service: r.service, amount: Number(r.amount), method: r.method, by: r.recorded_by, uid: r.user_id })));
+    if (data.length < 1000) break;
+  }
+  synced = new Map(tx.map(t => [t.id, JSON.stringify(t)]));
+  $('#av').textContent = session.name.charAt(0).toUpperCase(); $('#uName').textContent = session.name + (isOwner() ? ' · Owner' : ' · Staff');
+  $('#auth').hidden = true; $('#app').hidden = false; $('#authForm').reset(); $('#fDate').value = today();
+  buildNav(); document.body.classList.toggle('staff', !isOwner());
+  if (!allowed().map(p => p[0]).includes(location.hash.slice(1))) location.hash = '#' + allowed()[0][0];
+  refresh(); route();
+}
+async function logout() { await db.auth.signOut(); location.hash = ''; $('#app').hidden = true; $('#auth').hidden = false; setMode('login'); }
+$('#logout').onclick = logout; $('#logout2').onclick = logout;
+
+/* ===== K. PAST SALES: CSV import and opening balance ===== */
+function parseCSV(text) {   // small CSV reader that understands "quoted, values"
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+function toIso(s) {   // accepts 2026-10-31 or 31/10/2026 (order follows your date-format setting)
+  s = s.trim(); let m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) { const us = settings.dateFormat === 'MM/DD/YYYY'; return `${m[3]}-${pad(us ? m[1] : m[2])}-${pad(us ? m[2] : m[1])}`; }
+  return null;
+}
+let pending = [];
+$('#impBtn').onclick = () => { pending = []; $('#impFile').value = ''; $('#impMsg').textContent = ''; $('#impOk').disabled = true; $('#impDlg').showModal(); };
+$('#impCancel').onclick = () => $('#impDlg').close();
+$('#tplBtn').onclick = () => saveFile('sales-template.csv', 'Date,Service,Amount,Method\n2026-10-01,Photocopy,1500,Cash\n2026-10-01,Passport photos,2500,Transfer\n');
+$('#impFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rows = parseCSV(await f.text()), names = ['date', 'service', 'amount', 'method'];
+  const head = rows[0].map(x => x.trim().toLowerCase()), hasHead = head.some(x => names.includes(x));
+  const idx = k => hasHead ? head.indexOf(k) : names.indexOf(k);   // no header row? assume the standard column order
+  let bad = 0; pending = [];
+  rows.slice(hasHead ? 1 : 0).forEach((r, n) => {
+    const date = toIso(r[idx('date')] || ''), service = (r[idx('service')] || '').trim(), amount = parseFloat((r[idx('amount')] || '').replace(/[^0-9.]/g, ''));
+    if (!date || !service || !(amount > 0)) { bad++; return; }
+    pending.push({ id: 'i' + Date.now() + '-' + n, date, service, amount, method: /trans|pos|bank/i.test(r[idx('method')] || '') ? 'Transfer' : 'Cash', by: 'Imported', uid: session.id });
+  });
+  $('#impMsg').textContent = `${pending.length} sales ready to import` + (bad ? `, ${bad} rows skipped (check date, service and amount).` : '.');
+  $('#impOk').disabled = !pending.length;
+});
+$('#impOk').onclick = () => { tx.push(...pending); persist(); refresh(); $('#impDlg').close(); toast(`${pending.length} sales imported ✓`); pending = []; };
+$('#obBtn').onclick = () => { $('#obForm').reset(); $('#oDate').value = today(); $('#obDlg').showModal(); };
+$('#oCancel').onclick = () => $('#obDlg').close();
+$('#obForm').addEventListener('submit', () => {   // one saved entry per payment type that has an amount
+  const note = $('#oNote').value.trim() || 'Earlier sales (total)', date = $('#oDate').value;
+  [['Cash', parseFloat($('#oCash').value)], ['Transfer', parseFloat($('#oTr').value)]].forEach(([method, amount], i) => {
+    if (amount > 0) tx.push({ id: 'o' + Date.now() + '-' + i, date, service: note, amount, method, by: 'Opening balance', uid: session.id });
+  });
+  persist(); refresh(); toast('Opening balance saved ✓');
+});
+async function renderTeam() {   // owner sees the employee code and who has joined
+  $('#bizCode').value = session.biz;
+  const { data } = await db.from('sm_profiles').select('user_id, name').eq('business_id', session.biz).eq('role', 'staff');
+  $('#team').innerHTML = data && data.length ? data.map(u => `<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)"><b>${esc(u.name)}</b><button class="btn ghost sm" data-rm="${u.user_id}" style="color:var(--red)">Remove</button></div>`).join('') + '<div style="height:16px"></div>' : '<p class="empty" style="padding:6px 0 16px">No employees yet.</p>';
+}
+$('#team').addEventListener('click', async e => {
+  const b = e.target.closest('[data-rm]'); if (!b) return;
+  const { error } = await db.from('sm_profiles').delete().eq('user_id', b.dataset.rm);
+  if (error) return toast('Could not remove employee');
+  renderTeam(); toast('Employee removed');
+});
+
+/* ===== L. FORGOT PASSWORD: email a reset link, then let the person choose a new password ===== */
+$('#forgot').onclick = e => { e.preventDefault(); $('#fgMsg').textContent = ''; $('#fgEmail').value = $('#aEmail').value; $('#fgDlg').showModal(); };
+$('#fgCancel').onclick = () => $('#fgDlg').close();
+$('#fgSend').onclick = async () => {
+  const email = $('#fgEmail').value.trim().toLowerCase(); if (!email) return;
+  $('#fgSend').disabled = true;
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });   // must be listed in Supabase > Authentication > URL Configuration
+  $('#fgSend').disabled = false;
+  $('#fgMsg').textContent = error ? 'Could not send: ' + error.message : 'If that email has an account, a reset link is on its way. Check your inbox and spam folder.';
+};
+db.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') { $('#npMsg').textContent = ''; $('#npDlg').showModal(); } });   // fires when someone opens the emailed link
+$('#npSave').onclick = async () => {
+  const pw = $('#npPass').value;
+  if (pw.length < 6) { $('#npMsg').textContent = 'Use at least 6 characters.'; return; }
+  const { error } = await db.auth.updateUser({ password: pw });
+  if (error) { $('#npMsg').textContent = error.message; return; }
+  $('#npDlg').close(); $('#npPass').value = ''; toast('Password updated ✓'); enter().catch(() => {});
+};
+
+/* ===== START: log straight in if there is already a saved login ===== */
+setMode('login');
+db.auth.getSession().then(({ data }) => { if (data.session) enter().catch(() => { $('#app').hidden = true; }); });
+</script>
+</body></html>
